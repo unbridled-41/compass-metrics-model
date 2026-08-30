@@ -10,7 +10,6 @@ import json
 import os
 import sys
 import requests
-import tqdm
 import markdown
 # from compass_metrics.resources.config.ini import GITEE_TOKEN, GITHUB_TOKEN
 DATA_PATH = r"/data"

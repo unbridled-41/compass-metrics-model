@@ -10,7 +10,6 @@ import json
 import os
 import sys
 import requests
-import tqdm
 import markdown
 DATA_PATH = "/data"
 NOW_PATH =  os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

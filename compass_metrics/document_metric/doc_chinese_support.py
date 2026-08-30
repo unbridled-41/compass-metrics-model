@@ -18,7 +18,6 @@ import os
 import re
 import json
 import requests
-from git import Repo
 from compass_metrics.document_metric.utils import GITHUB_TOKEN,GITEE_TOKEN,TMP_PATH,JSON_REPOPATH
 from compass_metrics.document_metric.utils import load_json,check_github_gitee,clone_repo,save_json
 
