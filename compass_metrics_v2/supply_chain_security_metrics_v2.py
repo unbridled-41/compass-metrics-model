@@ -521,7 +521,9 @@ def _calc_ecology_test_coverage(sonar_scanner_result: Dict[str, Any]) -> Dict[st
         metric = m.get("metric")
         if metric == "duplicated_lines_density":
             try:
-                duplication_ratio = int(m.get("value") or 0)
+                # SonarQube 组件测量接口返回的 value 是字符串（如 "65.0"），
+                # 需先转 float 再取整，否则小数字符串会解析失败
+                duplication_ratio = int(float(m.get("value") or 0))
             except (TypeError, ValueError):
                 duplication_ratio = None
             for lo, hi, sc in ranges_dup:
@@ -530,7 +532,7 @@ def _calc_ecology_test_coverage(sonar_scanner_result: Dict[str, Any]) -> Dict[st
                     break
         elif metric == "coverage":
             try:
-                coverage_ratio = int(m.get("value") or 0)
+                coverage_ratio = int(float(m.get("value") or 0))
             except (TypeError, ValueError):
                 coverage_ratio = None
             for lo, hi, sc in ranges_cov:
