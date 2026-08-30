@@ -354,9 +354,9 @@ class BaseMetricsModel:
                      if metric_field:
                          if '_year' in metric_field:
                              self.metrics_model_enrich_year([repo], repo, self.level)
-                         if 'license' in metric_field or 'security' in metric_field or 'activity_quarterly_' in metric_field:
+                         elif 'license' in metric_field or 'security' in metric_field or 'activity_quarterly_' in metric_field:
                              self.metrics_model_enrich_version([repo], repo, self.level)
-                         if 'doc_' in metric_field or metric_field == 'org_contribution' or 'vul_' in metric_field:
+                         elif 'doc_' in metric_field or metric_field == 'org_contribution' or 'vul_' in metric_field:
                              self.metrics_model_enrich_version([repo], repo, self.level)
                          else:
                              self.metrics_model_enrich([repo], repo, self.level)
@@ -369,7 +369,7 @@ class BaseMetricsModel:
                     if len(combined_repo_list) > 0:
                         self.metrics_model_enrich_year(software_artifact_repo_list, self.community, self.level,
                                                   SOFTWARE_ARTIFACT)
-                if 'license' in metric_field or 'security' in metric_field or 'activity_quarterly_' in metric_field:
+                elif 'license' in metric_field or 'security' in metric_field or 'activity_quarterly_' in metric_field:
                     combined_repo_list = software_artifact_repo_list + governance_repo_list
                     if len(combined_repo_list) > 0:
                         self.metrics_model_enrich_version(software_artifact_repo_list, self.community, self.level,
