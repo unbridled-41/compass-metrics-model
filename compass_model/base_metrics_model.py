@@ -312,12 +312,18 @@ class BaseMetricsModel:
             default_metrics_thresholds = self.get_default_metrics_thresholds()
             for metrics, weights_thresholds in metrics_weights_thresholds.items():
                 if weights_thresholds["threshold"] is None:
+                    if metrics not in default_metrics_thresholds:
+                        raise Exception(
+                            "No default threshold configured for metric '%s' at level '%s'. "
+                            "Set the threshold explicitly or add it to compass_metrics/resources/thresholds.yaml"
+                            % (metrics, self.level))
                     weights_thresholds["threshold"] = default_metrics_thresholds[metrics]
                 weights_thresholds["weight"] = abs(weights_thresholds["weight"])
                 if metrics in NEGATICE_METRICS:
                     weights_thresholds["weight"] = -weights_thresholds["weight"]
             self.metrics_weights_thresholds = metrics_weights_thresholds
             self.metrics_weights_thresholds_hash = get_dict_hash(metrics_weights_thresholds)
+            self.validate_metrics_config()
         else:
             raise Exception("Invalid metrics param.")
 
@@ -328,6 +334,14 @@ class BaseMetricsModel:
             self.custom_fields = {}
             self.custom_fields_hash = None
     
+
+    def validate_metrics_config(self):
+        """Fail fast on unknown metric names instead of raising
+        a generic "Invalid metric" midway through enrichment."""
+        known_metrics = set(self._metrics_switch(None, []).keys())
+        unknown_metrics = sorted(set(self.metrics_weights_thresholds.keys()) - known_metrics)
+        if unknown_metrics:
+            raise Exception("Invalid metric: %s" % ", ".join(unknown_metrics))
 
     def get_default_metrics_thresholds(self):
         """ Get default thresholds for metrics """
@@ -608,9 +622,9 @@ class BaseMetricsModel:
                     item_datas = []
             helpers().bulk(client=self.client, actions=item_datas)
 
-    def get_metrics(self, date, repo_list):
+    def _metrics_switch(self, date, repo_list):
         """ Get the corresponding metrics data according to the metrics field """
-        metrics_switch = {
+        return {
             # git metadata
             "commit_frequency": lambda: commit_frequency(self.client, self.contributors_index, date, repo_list),
             "commit_frequency_last_year": lambda: commit_frequency_last_year(self.client, self.contributors_index, date, repo_list),
@@ -747,8 +761,8 @@ class BaseMetricsModel:
             "dependency_update_tool": lambda: dependency_update_tool(self.client, self.openchecker_index, repo_list),
         }
 
-        
-        
+    def get_metrics(self, date, repo_list):
+        metrics_switch = self._metrics_switch(date, repo_list)
         metrics = {}
         metric_list = {}
         for metric_field in self.metrics_weights_thresholds.keys():
