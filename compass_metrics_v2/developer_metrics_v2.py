@@ -750,6 +750,8 @@ def _tier_counts_from_contribution_map(contribution_map, core_ratio=0.5, regular
     """
     根据贡献量占比划分 core / regular / visitor，返回 (core_count, regular_count, visitor_count)。
     core: 累计贡献占比前 50% 的开发者；regular: 累计 50%–80%（即常客 20%–50% 贡献）；visitor: 剩余 <20%。
+    按累加前的累计占比归类：跨越 50% 边界的头部开发者归入 core，与
+    _get_core_contributor_set_from_maps（晋升/留存/流失）的口径保持一致。
     """
     if not contribution_map:
         return 0, 0, 0
@@ -760,14 +762,14 @@ def _tier_counts_from_contribution_map(contribution_map, core_ratio=0.5, regular
     cum = 0.0
     core_count = regular_count = visitor_count = 0
     for _, v in sorted_contributors:
-        cum += v
         ratio = cum / total
-        if ratio <= core_ratio:
+        if ratio < core_ratio:
             core_count += 1
-        elif ratio <= regular_end_ratio:
+        elif ratio < regular_end_ratio:
             regular_count += 1
         else:
             visitor_count += 1
+        cum += v
     return core_count, regular_count, visitor_count
 
 
