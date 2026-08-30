@@ -36,7 +36,27 @@ def get_period_range(end_date: datetime, period: str):
     else:  # quarter
         month = ((end_date.month - 1) // 3) * 3 + 1
         start_date = end_date.replace(month=month, day=1, hour=0, minute=0, second=0, microsecond=0)
-    return start_date, end_date
+
+    # 与 issue/repo/developer/contributor/git 各模块一致：窗口结束时间规范化到周期最后一天。
+    # enrich 循环传入的是周期第一天，若直接用其作为 to_date，
+    # 查询区间会变成 gte X lt X 的空区间，导致当前窗口指标恒为 0。
+    if period == "month":
+        if end_date.month == 12:
+            next_month = end_date.replace(year=end_date.year + 1, month=1, day=1)
+        else:
+            next_month = end_date.replace(month=end_date.month + 1, day=1)
+        actual_end_date = next_month - timedelta(seconds=1)
+    elif period == "year":
+        actual_end_date = end_date.replace(month=12, day=31, hour=23, minute=59, second=59)
+    else:  # quarter
+        quarter_end_month = ((end_date.month - 1) // 3) * 3 + 3
+        if quarter_end_month == 12:
+            next_start = end_date.replace(year=end_date.year + 1, month=1, day=1)
+        else:
+            next_start = end_date.replace(month=quarter_end_month + 1, day=1)
+        actual_end_date = next_start - timedelta(seconds=1)
+
+    return start_date, actual_end_date
 
 
 def get_previous_period_range(end_date: datetime, period: str):
