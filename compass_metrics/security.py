@@ -46,7 +46,11 @@ def get_security_msg(client, contributors_index, version, repo_list, page_size, 
     security_msg = get_all_index_data(client, index=contributors_index, body=query)
 
     if not security_msg:
-        get_license(repo_list, version)
+        # 逐仓库触发扫描：get_license 内部按单个仓库地址拼接
+        # project_url（f"{repo}.git"），传入整个 repo_list 会生成
+        # "['org/a', 'org/b'].git" 这样的非法地址，导致触发永远失败
+        for repo_url in repo_list:
+            get_license(repo_url, version)
         return []
 
     results = []
