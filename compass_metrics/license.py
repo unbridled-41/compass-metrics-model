@@ -117,8 +117,9 @@ def license_is_weak(client, contributors_index, version, repo_list, page_size=1)
     license_msg = get_license_msg(client, contributors_index, version, repo_list, page_size)
     licenses = _get_normalized_licenses(license_msg)
 
-    # 检查是否所有许可证都是宽松型的
-    all_weak = all(license in WEAK_LICENSES for license in licenses)
+    # 许可证数据为空时不做全称量词判定（all([]) 恒为 True），
+    # 缺少许可证信息的仓库不能被视作"全部为弱许可证"
+    all_weak = bool(licenses) and all(license in WEAK_LICENSES for license in licenses)
 
     result = {
         'license_is_weak': 1 if all_weak else 0,
@@ -182,8 +183,8 @@ def license_commercial_allowed(client, contributors_index, version, repo_list, p
     license_msg = get_license_msg(client, contributors_index, version, repo_list, page_size)
     licenses = _get_normalized_licenses(license_msg)
 
-    # 检查是否所有许可证都允许闭源
-    all_commercial_allowed = all(license in COMMERCIAL_ALLOWED_LICENSES for license in licenses)
+    # 检查是否所有许可证都允许闭源（许可证数据为空时不判定为允许）
+    all_commercial_allowed = bool(licenses) and all(license in COMMERCIAL_ALLOWED_LICENSES for license in licenses)
 
     # 找出不允许闭源的许可证
     non_commercial_licenses = [license for license in licenses if license not in COMMERCIAL_ALLOWED_LICENSES]
@@ -228,10 +229,15 @@ def check_license_compatibility(licenses):
         }
 
     # 检查许可证兼容性
+    # 兼容矩阵是单向的（如 mit 声明与 gpl-2.0 兼容，反之未必），
+    # 且 license_list 由 set 转换而来、顺序受哈希随机化影响，
+    # 因此一对许可证必须双向都声明不兼容才判定为不兼容，
+    # 否则同一仓库的判定结果会随列表顺序在不同进程间翻转。
     incompatible_pairs = []
     for i, lic1 in enumerate(licenses):
         for lic2 in licenses[i + 1:]:
-            if lic2 not in LICENSE_COMPATIBILITY[lic1]:
+            if (lic2 not in LICENSE_COMPATIBILITY[lic1]
+                    and lic1 not in LICENSE_COMPATIBILITY[lic2]):
                 incompatible_pairs.append((lic1, lic2))
 
     if incompatible_pairs:
