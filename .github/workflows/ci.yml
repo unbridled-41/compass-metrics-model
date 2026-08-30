@@ -1,0 +1,82 @@
+# Continuous integration for compass-metrics-model.
+#
+# - unit-tests (3.8): installs the pinned production requirements.txt, guarding
+#   the dependency set the services actually deploy with.
+# - unit-tests (3.12): installs the current development dependency set, guarding
+#   modern-Python compatibility of the metric and model packages.
+# - build-wheel: builds the distribution so packaging regressions (e.g. packages
+#   silently dropped from the wheel) fail in CI instead of at install time.
+#   The packaging coverage itself is asserted by tests/test_packaging.py.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: unit-tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.8"
+            prod-requirements: "true"
+          - python-version: "3.12"
+            prod-requirements: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ "${{ matrix.prod-requirements }}" = "true" ]; then
+            pip install -r requirements.txt
+          else
+            pip install pandas pendulum python-dateutil PyYAML \
+              "elasticsearch==6.3.1" opensearch-py requests "setuptools<81"
+          fi
+          # requests/apscheduler 覆盖旧版 requirements.txt 的缺口（依赖声明 PR 合并后为冗余兜底）
+          # tqdm/markdown/GitPython 覆盖尚未移除的死 import（同上）
+          pip install pytest requests apscheduler tqdm markdown GitPython
+
+      # tests/ 由在途的测试类 PR 引入；在其合并前的本分支合并引用上尚不存在，跳过而非误报
+      - name: Run unit tests
+        run: |
+          if [ -d tests ]; then
+            python -m pytest tests/ -v
+          else
+            echo "No tests/ directory on this ref yet; nothing to run."
+          fi
+
+  build-wheel:
+    name: build-wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build distribution
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel --outdir dist/
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel
+          path: dist/*.whl
