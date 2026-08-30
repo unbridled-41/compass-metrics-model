@@ -219,7 +219,7 @@ def get_date_list(begin_date, end_date, freq='W-MON'):
 def get_date_list_by_period(begin_date, end_date,period):
     '''
         根据 period 获取从 begin_date 到 end_date 的时间列表
-        period: 'day', 'week', 'month', 'year'
+        period: 'day', 'week', 'month', 'quarter', 'year'
         '''
 
     # 1. 定义 period 到 Pandas freq 的映射关系
@@ -227,10 +227,11 @@ def get_date_list_by_period(begin_date, end_date,period):
     # 'D': 每日
     # 'W-MON': 每周 (周一开始)
     # 'MS': 每月 (月初开始, Month Start) -> 注意：用 'M' 会是月末
+    # 'QS': 每季度 (季初开始, Quarter Start)
     # 'YS': 每年 (年初开始, Year Start)
-    print(f"period: {period}")
     freq_map = {
-
+        'day': 'D',
+        'week': 'W-MON',
         'month': 'MS',
         'quarter': 'QS',
         'year': 'YS'
@@ -238,10 +239,9 @@ def get_date_list_by_period(begin_date, end_date,period):
 
     # 2. 获取对应的 freq，如果没传或者找不到，默认设为 'W-MON' (按周)
     # 这里的 .get(period, 'W-MON') 意味着如果 period 是乱写的，就默认按周处理
-    freq = freq_map.get(period, 'MS')
+    freq = freq_map.get(period, 'W-MON')
 
-    # 3. 生成时间列表 (保留了你原有的转换逻辑)
-    # 建议直接用 .tolist()，比 [x for x in list(...)] 更快更简洁
+    # 3. 生成时间列表
     date_list = pd.date_range(
         freq=freq,
         start=datetime_to_utc(str_to_datetime(begin_date)),
