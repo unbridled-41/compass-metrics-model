@@ -51,9 +51,14 @@ jobs:
           # tqdm/markdown/GitPython 覆盖尚未移除的死 import（同上）
           pip install pytest requests apscheduler tqdm markdown GitPython
 
-      # pytest 无测试可收集时退出码为 5（tests/ 由在途测试 PR 引入），其余失败照常报红
+      # tests/ 由在途的测试类 PR 引入；在其合并前的本分支合并引用上尚不存在，跳过而非误报
       - name: Run unit tests
-        run: python -m pytest tests/ -v || test $? -eq 5
+        run: |
+          if [ -d tests ]; then
+            python -m pytest tests/ -v
+          else
+            echo "No tests/ directory on this ref yet; nothing to run."
+          fi
 
   build-wheel:
     name: build-wheel

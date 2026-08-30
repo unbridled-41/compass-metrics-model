@@ -424,12 +424,18 @@ class BaseMetricsModel:
             default_metrics_thresholds = self.get_default_metrics_thresholds()
             for metrics, weights_thresholds in metrics_weights_thresholds.items():
                 if weights_thresholds["threshold"] is None:
+                    if metrics not in default_metrics_thresholds:
+                        raise Exception(
+                            "No default threshold configured for metric '%s' at level '%s'. "
+                            "Set the threshold explicitly or add it to compass_metrics/resources/thresholds.yaml"
+                            % (metrics, self.level))
                     weights_thresholds["threshold"] = default_metrics_thresholds[metrics]
                 weights_thresholds["weight"] = abs(weights_thresholds["weight"])
                 if metrics in NEGATICE_METRICS:
                     weights_thresholds["weight"] = -weights_thresholds["weight"]
             self.metrics_weights_thresholds = metrics_weights_thresholds
             self.metrics_weights_thresholds_hash = get_dict_hash(metrics_weights_thresholds)
+            self.validate_metrics_config()
         else:
             raise Exception("Invalid metrics param.")
 
@@ -442,6 +448,14 @@ class BaseMetricsModel:
             self.custom_fields_hash = None
 
 
+
+    def validate_metrics_config(self):
+        """Fail fast on unknown metric names instead of raising
+        a generic "Invalid metric" midway through enrichment."""
+        known_metrics = set(self._metrics_switch(None, [], getattr(self, 'period', None) or 'month').keys())
+        unknown_metrics = sorted(set(self.metrics_weights_thresholds.keys()) - known_metrics)
+        if unknown_metrics:
+            raise Exception("Invalid metric: %s" % ", ".join(unknown_metrics))
 
     def get_default_metrics_thresholds(self):
         """ Get default thresholds for metrics """
@@ -468,9 +482,9 @@ class BaseMetricsModel:
                      if metric_field:
                          if '_year' in metric_field:
                              self.metrics_model_enrich_year([repo], repo, self.level)
-                         if 'license' in metric_field or 'security' in metric_field or 'activity_quarterly_' in metric_field:
+                         elif 'license' in metric_field or 'security' in metric_field or 'activity_quarterly_' in metric_field:
                              self.metrics_model_enrich_version([repo], repo, self.level)
-                         if 'doc_' in metric_field or metric_field == 'org_contribution' or 'vul_' in metric_field:
+                         elif 'doc_' in metric_field or metric_field == 'org_contribution' or 'vul_' in metric_field:
                              self.metrics_model_enrich_version([repo], repo, self.level)
                          else:
                              self.metrics_model_enrich([repo], repo, self.level)
@@ -483,7 +497,7 @@ class BaseMetricsModel:
                     if len(combined_repo_list) > 0:
                         self.metrics_model_enrich_year(software_artifact_repo_list, self.community, self.level,
                                                   SOFTWARE_ARTIFACT)
-                if 'license' in metric_field or 'security' in metric_field or 'activity_quarterly_' in metric_field:
+                elif 'license' in metric_field or 'security' in metric_field or 'activity_quarterly_' in metric_field:
                     combined_repo_list = software_artifact_repo_list + governance_repo_list
                     if len(combined_repo_list) > 0:
                         self.metrics_model_enrich_version(software_artifact_repo_list, self.community, self.level,
@@ -540,7 +554,6 @@ class BaseMetricsModel:
                 **self.custom_fields
             }
             cache_last_metrics_data(metrics_data, last_metrics_data)
-            metrics_data["score"] = self.get_metrics_score(self.metrics_decay(metrics_data, last_metrics_data))
             try:
                 metrics_data["score"] = self.get_metrics_score(self.metrics_decay(metrics_data, last_metrics_data))
             except Exception as e:
@@ -728,8 +741,9 @@ class BaseMetricsModel:
                     item_datas = []
             helpers().bulk(client=self.client, actions=item_datas)
 
-    def get_metrics(self, date, repo_list, period='month'):
-        metrics_switch = {
+    def _metrics_switch(self, date, repo_list, period='month'):
+        """ Get the corresponding metrics data according to the metrics field """
+        return {
             # git metadata
             "commit_frequency": lambda: commit_frequency(self.client, self.contributors_index, date, repo_list),
             "commit_frequency_last_year": lambda: commit_frequency_last_year(self.client, self.contributors_index, date, repo_list),
@@ -892,7 +906,7 @@ class BaseMetricsModel:
             "lines_changed_by_period": lambda: lines_changed_by_period(self.client, self.contributors_enriched_index, date,repo_list,period),
             "issue_comment_activity_by_period": lambda: issue_comment_activity_by_period(self.client, self.issue_index, date,repo_list,period),
             "issue_new_count_by_period": lambda: issue_new_count_by_period(self.client, self.issue_index, date,repo_list,period),
-            "pr_comment_count_by_period": lambda: pr_comment_count_by_period(self.client, self.issue_index, date,repo_list,period),
+            "pr_comment_count_by_period": lambda: pr_comment_count_by_period(self.client, self.pr_index, date,repo_list,period),
 
             "repo_forks_by_period": lambda: repo_forks_by_period(self.client, self.repo_index, date, repo_list,period),
             "repo_stars_by_period": lambda: repo_stars_by_period(self.client, self.repo_index, date, repo_list,period),
@@ -997,10 +1011,9 @@ class BaseMetricsModel:
 
 
         }
-        """ Get the corresponding metrics data according to the metrics field """
 
-
-
+    def get_metrics(self, date, repo_list, period='month'):
+        metrics_switch = self._metrics_switch(date, repo_list, period)
         metrics = {}
         metric_list = {}
         for metric_field in self.metrics_weights_thresholds.keys():
