@@ -147,7 +147,9 @@ def get_items(client, index, body, size, scroll_id=None, scroll="5m"):
         else:
             page = client.scroll(scroll_id=scroll_id, scroll=scroll)
     except Exception as e:
-        if too_many_scrolls(e.info):
+        # 非 ES 传输类异常没有 info 属性，直接访问会抛 AttributeError
+        # 并掩盖原始异常
+        if too_many_scrolls(getattr(e, "info", None)):
             return {'too_many_scrolls': True}
     return page
 
@@ -171,5 +173,5 @@ def free_scroll(client, scroll_id=None):
         return
     try:
         client.clear_scroll(scroll_id=scroll_id)
-    except Exception as e:
-        logger.debug("Error releasing scroll: {}".scroll_id)
+    except Exception:
+        logger.debug("Error releasing scroll: {}".format(scroll_id))
